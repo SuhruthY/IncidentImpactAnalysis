@@ -62,7 +62,7 @@ Ensure you have the following installed:
    ```bash
    mvn spring-boot:run
    ```
-4. The API will be accessible at `http://localhost:8080/api/incidents/impact`
+4. The API will be accessible at `http://localhost:8080/incident-impact-analysis?page=PAGE_NUM`
 
 ---
 
@@ -85,7 +85,7 @@ Ensure you have the following installed:
 
 ## API Endpoints
 ### Backend API
-- **`GET /api/incidents/impact`** - Analyzes and returns the incident impact.
+- **`GET /incident-impact-analysis`** - Analyzes and returns the incident impact.
 
 ### Frontend Integration
 - Uses `IncidentService` to fetch incident data from the backend.
