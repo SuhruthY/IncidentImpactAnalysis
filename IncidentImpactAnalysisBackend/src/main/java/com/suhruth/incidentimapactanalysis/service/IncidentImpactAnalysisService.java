@@ -9,11 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import com.suhruth.incidentimapactanalysis.exception.PageLimitExceededException;
 import com.suhruth.incidentimapactanalysis.model.IncidentImpactAnalysis;
 import com.suhruth.incidentimapactanalysis.model.Incidents;
 import com.suhruth.incidentimapactanalysis.model.PaginatedResponse;
-import com.suhruth.incidentimapactanalysis.model.Shooters;
-import com.suhruth.incidentimapactanalysis.model.Victims;
 import com.suhruth.incidentimapactanalysis.repository.IncidentsRepository;
 import com.suhruth.incidentimapactanalysis.repository.ShootersRepository;
 import com.suhruth.incidentimapactanalysis.repository.VictimsRepository;
@@ -35,6 +34,11 @@ public class IncidentImpactAnalysisService {
 
 		// Step 1: Use `Page` to manage pagination
 		var page = victimsRepo.findAll(PageRequest.of(pageNumber, pageSize));
+
+		// Check if content is empty or page exceeds limits
+		if (page.getContent().isEmpty() || pageNumber >= page.getTotalPages()) {
+			throw new PageLimitExceededException("No more content available. Page limit reached.");
+		}
 
 		// Step 2: Extract data from the page
 		List<IncidentImpactAnalysis> analysisList = page.getContent().stream().map(v -> v.getIncidentId()).distinct()
@@ -88,17 +92,4 @@ public class IncidentImpactAnalysisService {
 				.totalPages(page.getTotalPages() - 1) //
 				.totalElements(page.getTotalElements()).build();
 	}
-
-	public List<Incidents> getAllIncidents() {
-		return incidentsRepo.findAll();
-	}
-
-	public List<Shooters> getAllShooters() {
-		return shootersRepo.findAll();
-	}
-
-	public List<Victims> getAllVictims() {
-		return victimsRepo.findAll();
-	}
-
 }
