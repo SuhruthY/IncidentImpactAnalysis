@@ -1,0 +1,80 @@
+<div class="container mt-4">
+  <h1 class="text-center text-primary mb-4">Incident Impact Analysis Data</h1>
+
+  <div class="table-responsive">
+    <table class="table table-bordered table-hover">
+      <thead class="table-dark">
+        <tr class="text-center">
+          <th>Incident Id</th>
+          <th class="col-md-1">Date</th>
+          <th>School</th>
+          <th>Class</th>
+          <th>Location</th>
+          <th>Duration</th>
+          <th>Total Victims</th>
+          <th>Victim/Shooter Ratio</th>
+          <th>Fatality Score</th>
+          <th>Media Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let incident of incidents | sort: 'fatalityScore':'desc'">
+          <td>{{ incident.id }}</td>
+          <td>{{ incident.date | date:'yyyy-MM-dd' }}</td>
+          <td>{{ incident.schoolName }}</td>
+          <td>{{ incident.schoolType }}</td>
+          <td>{{ incident.location }}</td>
+          <td>{{ incident.duration }} min</td>
+          <td class="text-center" >{{ incident.totalVictims }}</td>
+          <td class="text-center" >{{ incident.victimToShooters }}</td>
+          <td class="text-center" >{{ incident.fatalityScore.toFixed(0) }}%</td>
+          <td class="text-center" >{{ incident.mediaScore }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div *ngIf="incidents.length === 0" class="alert alert-warning text-center mt-3">
+    No data available.
+  </div>
+
+  
+<!-- Pagination Controls -->
+<div class="pagination-controls d-flex align-items-center justify-content-between gap-1 mt-3" *ngIf="incidents.length > 0">
+  <div>
+    <p>Showing {{incidents.length}} out of {{totalElements}} results</p>
+  </div>
+  <div>
+    <button 
+      class="btn btn-main me-1"
+      [disabled]="currentPage === 1"
+      (click)="changePage(currentPage - 1)">
+      Previous
+    </button>
+
+    <ng-container *ngFor="let page of getPaginationRange()">
+      <button 
+        *ngIf="page !== '...'" 
+        class="btn px-2 py-1"
+        [class.active]="page === currentPage"
+        (click)="changePage(page)"
+      >
+        {{ page }}
+      </button>
+
+      <span *ngIf="page === '...'" class="pagination-ellipsis">• • •</span>
+    </ng-container>
+
+    <button 
+      class="btn btn-main ms-1"
+      [disabled]="currentPage === totalPages"
+      (click)="changePage(currentPage + 1)">
+      Next
+    </button>
+  </div>
+</div>
+
+<br>
+<br>
+
+</div>

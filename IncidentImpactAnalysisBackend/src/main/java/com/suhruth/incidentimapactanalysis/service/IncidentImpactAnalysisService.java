@@ -3,16 +3,17 @@ package com.suhruth.incidentimapactanalysis.service;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import com.suhruth.incidentimapactanalysis.exception.PageLimitExceededException;
 import com.suhruth.incidentimapactanalysis.model.IncidentImpactAnalysis;
 import com.suhruth.incidentimapactanalysis.model.Incidents;
 import com.suhruth.incidentimapactanalysis.model.PaginatedResponse;
+import com.suhruth.incidentimapactanalysis.model.Victims;
 import com.suhruth.incidentimapactanalysis.repository.IncidentsRepository;
 import com.suhruth.incidentimapactanalysis.repository.ShootersRepository;
 import com.suhruth.incidentimapactanalysis.repository.VictimsRepository;
@@ -31,33 +32,52 @@ public class IncidentImpactAnalysisService {
 
 	public PaginatedResponse getAll(int pageNumber, int pageSize) {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+		
+		List<Victims> allVictims = victimsRepo.findAll();
 
-		// Step 1: Use `Page` to manage pagination
-		var page = victimsRepo.findAll(PageRequest.of(pageNumber, pageSize));
+		// Step 1: Extract distinct incident IDs and count them
+		List<String> distinctIncidentIds = allVictims.stream()
+		        .map(Victims::getIncidentId)
+		        .distinct()
+		        .collect(Collectors.toList()); // Collect distinct IDs first
 
-		// Check if content is empty or page exceeds limits
-		if (page.getContent().isEmpty() || pageNumber >= page.getTotalPages()) {
+		// Step 2: Get the total count
+		int totalDistinctIncidents = distinctIncidentIds.size();
+
+		// Step 3: Apply pagination logic
+		distinctIncidentIds = distinctIncidentIds.stream()
+		        .skip((long) pageNumber * pageSize)
+		        .limit(pageSize)
+		        .collect(Collectors.toList());
+
+
+		if (distinctIncidentIds.isEmpty()) {
 			throw new PageLimitExceededException("No more content available. Page limit reached.");
 		}
 
-		// Step 2: Extract data from the page
-		List<IncidentImpactAnalysis> analysisList = page.getContent().stream().map(v -> v.getIncidentId()).distinct()
+		// Step 4: Extract data from the page
+		List<IncidentImpactAnalysis> analysisList = distinctIncidentIds.parallelStream() //
 				.map(i -> {
-
-					long[] counts = victimsRepo.findByIncidentId(i).stream().collect(Collectors.teeing(
-							Collectors.filtering(v -> "Fatal".equalsIgnoreCase(v.getInjury()), Collectors.counting()),
-							Collectors.filtering(v -> v.getInjury() == null || !"Fatal".equalsIgnoreCase(v.getInjury()),
-									Collectors.counting()),
-							(killed, wounded) -> new long[] { killed, wounded }));
-
-					long shooters = (long) shootersRepo.findByIncidentId(i).size();
 
 					Incidents incident = incidentsRepo.findById(i).orElse(null);
 					if (incident == null)
 						return null;
 
+					// Aggregate victim data efficiently
+					long[] counts = allVictims.stream().filter(v -> v.getIncidentId().equals(i))
+							.collect(Collectors.teeing(
+									Collectors.filtering(v -> "Fatal".equalsIgnoreCase(v.getInjury()),
+											Collectors.counting()),
+									Collectors.filtering(
+											v -> v.getInjury() == null || !"Fatal".equalsIgnoreCase(v.getInjury()),
+											Collectors.counting()),
+									(killed, wounded) -> new long[] { killed, wounded }));
+
+					long shooters = shootersRepo.findAll().stream().filter(s -> s.getIncidentId().equals(i)).count();
+
 					try {
-						return IncidentImpactAnalysis.builder().id(i)//
+						return IncidentImpactAnalysis.builder() //
+								.id(i) //
 								.date(dateFormat.parse(incident.getDate())) //
 								.schoolName(incident.getSchool()) //
 								.schoolType(incident.getSchool_Level()) //
@@ -66,18 +86,10 @@ public class IncidentImpactAnalysisService {
 								.duration(incident.getDuration_min()) //
 								.wounded(counts[1]) //
 								.shooters(shooters) //
-								.totalVictims(counts[0] + counts[1])//
+								.totalVictims(counts[0] + counts[1]) //
 								.victimToShooters((counts[0] + counts[1]) + "/" + shooters) //
-								.fatalityScore(counts[0] * 100 / (counts[0] + counts[1]))//
-								.mediaScore(
-										switch (incident.getMedia_Attention() != null ? incident.getMedia_Attention()
-												: "") {
-										case "National" -> 5;
-										case "International" -> 10;
-										case "Regional" -> 3;
-										case "Local" -> 1;
-										default -> 0;
-										})
+								.fatalityScore(counts[0] * 100 / (counts[0] + counts[1])) //
+								.mediaScore(mapMediaScore(incident.getMedia_Attention())) //
 								.build();
 					} catch (ParseException e) {
 						e.printStackTrace();
@@ -85,11 +97,25 @@ public class IncidentImpactAnalysisService {
 					}
 				}).collect(Collectors.toList());
 
-		// Step 3: Return the custom `PaginatedResponse`
+		// Step 5: Return the custom `PaginatedResponse`
+		int totalPages = (int) Math.ceil((double) totalDistinctIncidents / pageSize)-1;
+
 		return PaginatedResponse.builder() //
-				.content(analysisList)//
-				.currentPage(page.getNumber())//
-				.totalPages(page.getTotalPages() - 1) //
-				.totalElements(page.getTotalElements()).build();
+				.content(analysisList) //
+				.currentPage(pageNumber) //
+				.totalPages(totalPages) //
+				.totalElements(totalDistinctIncidents) //
+				.build();
+	}
+
+	// Optimized media score mapping
+	private int mapMediaScore(String mediaAttention) {
+		return switch (mediaAttention != null ? mediaAttention : "") {
+		case "National" -> 5;
+		case "International" -> 10;
+		case "Regional" -> 3;
+		case "Local" -> 1;
+		default -> 0;
+		};
 	}
 }

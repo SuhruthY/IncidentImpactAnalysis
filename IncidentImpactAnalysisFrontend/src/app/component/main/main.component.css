@@ -1,0 +1,33 @@
+.table th,
+.table td {
+	vertical-align: middle;
+}
+
+.pagination-controls .btn {
+	padding: 4px 10px;
+	min-width: 32px;
+}
+
+.pagination-ellipsis {  
+    letter-spacing: 4px;    
+    margin: 0 4px;   
+    vertical-align: middle;  
+    display: inline-block;
+}
+
+.btn-main {
+	border: .5px solid gray;
+	border-radius: 4px;
+    width: 100px;
+}
+
+.btn-main:hover {
+	background-color: black;
+    color: white;
+}
+
+.btn.active {
+	background-color: black;
+	color: white;
+	font-weight: bold;
+}
